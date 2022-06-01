@@ -5,6 +5,7 @@ grammaire = lark.Lark("""
 variables : typed_variable (","  typed_variable)*
 expr :  IDENTIFIANT -> variable | NUMBER -> nombre | "'" STR "'"-> str | "malloc" "(" expr ")" -> malloc | IDENTIFIANT ".cAt" "(" expr ")" -> cat 
 | expr OP expr -> binexpr | "(" expr ")" -> parenexpr | POINTER expr -> valeur | "&" IDENTIFIANT -> adresse | "len(" expr ")" -> len
+
 cmd : IDENTIFIANT "=" expr ";"-> assignment | POINTER IDENTIFIANT "=" expr ";"-> assignment1 |"while" "(" expr ")" "{" bloc "}" -> while
     | "if" "(" expr ")" "{" bloc "}" -> if | "printf" "(" expr ")" ";"-> printf | typed_variable ";" -> variable
 POINTER : /[*]+/
@@ -123,6 +124,12 @@ def compile_expr(expr):
 
     elif expr.data == "parenexpr":
         return compile_expr(expr.children[0])
+    
+    elif expr.data == "malloc":
+        e1 = compile_expr(expr.children[0])
+        return f"mov rdi, {e1}\ncall malloc\n"
+
+
     else:
         raise Exception("Not implemented")
 
