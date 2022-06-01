@@ -7,7 +7,7 @@ cmd : IDENTIFIANT "=" expr ";"-> assignment | POINTER IDENTIFIANT "=" expr ";"->
     | "if" "(" expr ")" "{" bloc "}" -> if | "printf" "(" expr ")" ";"-> printf | typed_variable ";" -> variable
 POINTER : /[*]+/
 bloc : (cmd)*
-prog : "main" "(" variables ")" "{" bloc "return" "(" expr ")" ";" "}"
+prog : BASIC_TYPE "main" "(" variables ")" "{" bloc "return" "(" expr ")" ";" "}"
 typed_variable : BASIC_TYPE  IDENTIFIANT
 BASIC_TYPE : /(int|str)[*]*/
 STR : /[a-zA-Z0-9]+/
@@ -25,7 +25,6 @@ def pp_variables(vars):
 
 
 def pp_expr(expr):
-    print( "hey", expr)
     if expr.data in {"variable", "nombre"}:
         return expr.children[0].value
     if expr.data =="str":
@@ -81,10 +80,11 @@ def pp_bloc(bloc):
 
 
 def pp_prg(prog):
-    vars = pp_variables(prog.children[0])
-    bloc = pp_bloc(prog.children[1])
-    ret = pp_expr(prog.children[2])
-    return f"main ({vars}){{\n {bloc} return ({ret});\n}}"
+    type_fct=prog.children[0]
+    vars = pp_variables(prog.children[1])
+    bloc = pp_bloc(prog.children[2])
+    ret = pp_expr(prog.children[3])
+    return f"{type_fct} main ({vars}){{\n {bloc} return ({ret});\n}}"
 
 def var_list(ast):
     if isinstance(ast, lark.Token):
@@ -102,9 +102,9 @@ def compile(prg):
         code=f.read()
         var_decl="\n".join([f"{x} : dq 0" for x in var_list(prg)])
         code=code.replace("VAR_DECL",var_decl)
-        code=code.replace("RETURN",compile_expr(prg.children[2]))
-        code=code.replace("BODY",compile_bloc(prg.children[1]))
-        code = code.replace("VAR_INIT",compile_vars(prg.children[0]))
+        code=code.replace("RETURN",compile_expr(prg.children[3]))
+        code=code.replace("BODY",compile_bloc(prg.children[2]))
+        code = code.replace("VAR_INIT",compile_vars(prg.children[1]))
         return code
 
 def compile_expr(expr):
@@ -125,9 +125,10 @@ def compile_expr(expr):
         raise Exception("Not implemented")
 
 def compile_vars(ast):
+    print(ast.children[0].children[1])
     s=""
     for i in range(len(ast.children)):
-        s +=f"mov rbx, [rbp-0x10]\nmov rdi,[rbx+{8*(i+1)}]\ncall atoi\nmov [{ast.children[i].value}], rax\n"
+        s +=f"mov rbx, [rbp-0x10]\nmov rdi,[rbx+{8*(i+1)}]\ncall atoi\nmov [{ast.children[i].children[1]}], rax\n"
     return s
 
 def compile_cmd(cmd):
@@ -148,16 +149,11 @@ def compile_cmd(cmd):
 def compile_bloc(bloc):
     return "\n".join([compile_cmd(t) for t in bloc.children])
 
-prg = grammaire.parse("""main(int X, int Z) {
-    p=malloc(10);
-    str test;
-    test='com'+'com';
-    str t;
-    t=test.cAt(2);
-    t=len(t);
-return(test); }""")
+prg = grammaire.parse("""int main(int X) {
+    X = X + 1;
+return(X); }""")
 print(prg)
 prg2 = pp_prg(prg)
 print(prg2)
-#print(compile(prg))
+print(compile(prg))
 
