@@ -159,6 +159,7 @@ def compile_bloc(bloc):
 
 prg = grammaire.parse("""int main(int X) {
     X = X + 1;
+
     int Y;
     str Z;
     int h;
