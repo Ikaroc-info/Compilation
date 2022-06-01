@@ -1,4 +1,6 @@
 import lark
+global Dict
+Dict = {}
 grammaire = lark.Lark("""
 variables : typed_variable (","  typed_variable)*
 expr :  IDENTIFIANT -> variable | NUMBER -> nombre | "'" STR "'"-> str | "malloc" "(" expr ")" -> malloc | IDENTIFIANT ".cAt" "(" expr ")" -> cat 
@@ -132,6 +134,7 @@ def compile_vars(ast):
     return s
 
 def compile_cmd(cmd):
+    global Dict
     if cmd.data == "assignment":
         lhs = cmd.children[0].value
         rhs = compile_expr(cmd.children[1])
@@ -143,6 +146,11 @@ def compile_cmd(cmd):
         b = compile_bloc(cmd.children[1])
         index=next(cpt)
         return f"debut{index}:{e}\ncmp rax,0\njz fin{index}\n{b}\njmp debut{index}\nfin{index}:\n"
+    elif cmd.data == "variable":
+        Dict[cmd.children[0].children[1].value]=cmd.children[0].children[0].value
+        print(Dict)
+        return ""
+
     else:
         raise Exception("Not implemented")
 
@@ -151,9 +159,12 @@ def compile_bloc(bloc):
 
 prg = grammaire.parse("""int main(int X) {
     X = X + 1;
+    int Y;
+    str Z;
+    int h;
 return(X); }""")
-print(prg)
-prg2 = pp_prg(prg)
-print(prg2)
+#print(prg)
+#prg2 = pp_prg(prg)
+#print(prg2)
 print(compile(prg))
 
