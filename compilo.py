@@ -125,6 +125,19 @@ def compile_expr(expr):
         return [Dict[expr.children[0].value]["type"], f"mov rax, [{expr.children[0].value}]"]
     elif expr.data == "nombre":
         return ["int", f"mov rax, {expr.children[0].value}"]
+
+    elif expr.data == "valeur":
+        rtn = f"mov rbx, [{expr.children[1].children[0].value}]\n"
+        nb = str(expr.children[0].value).count("*")
+        for i in range(nb-1):
+            rtn += f"mov rbx, [rbx]\n"
+        rtn += "mov rax, [rbx]"
+        return [Dict[expr.children[1].children[0].value],rtn]
+
+    elif expr.data == "adresse":
+        print(expr)
+        return ["int", f"lea rax, [{expr.children[0].value}]"]
+
     elif expr.data == "binexpr":
         [type_e1,e1] = compile_expr(expr.children[0])
         [type_e2,e2] = compile_expr(expr.children[2])
@@ -146,7 +159,9 @@ def compile_expr(expr):
     
     elif expr.data == "malloc":
         [type_e1,e1] = compile_expr(expr.children[0])
-        return [type_e1,f"{e1}\nmov rdi, rax\ncall malloc\n"]
+        if type_e1!="int":
+            raise Exception("Incompatible type, needs int")
+        return ["int",f"{e1}\nmov rdi, rax\ncall malloc\n"]
 
 
     elif expr.data == "str":
@@ -175,7 +190,7 @@ def compile_cmd(cmd):
         lhs = cmd.children[0].value
         type_lhs=Dict[cmd.children[0].value]["type"]
         [type_rhs,rhs] = compile_expr(cmd.children[1])
-        if type_lhs != type_rhs:
+        if type_lhs != type_rhs and ("*" in "type_lhs" and "type_rhs"!="int"):
             raise Exception("Type mismatch")
         return f"{rhs}\nmov [{lhs}],rax"
 
@@ -186,15 +201,20 @@ def compile_cmd(cmd):
             raise Exception("Type mismatch")
         Dict[cmd.children[0].value] = rhs
         return rtn
-
-    elif cmd.data == "assignment1":
-        lhs = cmd.children[0].value
-        rhs = compile_expr(cmd.children[1])
-        return f"{rhs}\nmov [{lhs}],rax"
-
+      
+    if cmd.data == "assignment1":
+        lhs = cmd.children[1].value
+        [type_rhs,rhs] = compile_expr(cmd.children[2])
+        rtn = f"{rhs}\nmov rbx, [{lhs}]\n"
+        nb = str(cmd.children[0].value).count("*")
+        for i in range(nb-1):
+            rtn += f"mov rbx, [rbx]\n"
+        rtn += f"mov [rbx], rax\n"
+        return rtn
 
     elif cmd.data == "printf":
         return f"printf( {pp_expr(cmd.children[0])} );"
+
     elif cmd.data == "while":
         e = compile_expr(cmd.children[0])
         b = compile_bloc(cmd.children[1])
@@ -217,6 +237,7 @@ prg = grammaire.parse("""int main(int X) {
     B = 'bac';
     X = B.cAt(2);
 return(X); }""")
+
 #print(prg)
 #prg2 = pp_prg(prg)
 #print(prg2)
