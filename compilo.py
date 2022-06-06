@@ -132,8 +132,8 @@ def compile_expr(expr):
         return compile_expr(expr.children[0])
     
     elif expr.data == "malloc":
-        e1 = compile_expr(expr.children[0])
-        return f"{e1}\nmov rdi, rax\ncall malloc\n"
+        [type_e1,e1] = compile_expr(expr.children[0])
+        return [type_e1,f"{e1}\nmov rdi, rax\ncall malloc\n"]
 
 
     else:
@@ -180,8 +180,8 @@ def compile_bloc(bloc):
     return "\n".join([compile_cmd(t) for t in bloc.children])
 
 prg = grammaire.parse("""int main(int X) {
+    int X;
     X = X + 1;
-    &Z = 12
 
     int Y;
     Y = malloc(2+4);
