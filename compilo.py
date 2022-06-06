@@ -113,12 +113,22 @@ def compile(prg):
         return code
 
 def compile_expr(expr):
+    print(expr)
     if expr.data == "variable":
         if expr.children[0].value not in Dict.keys():
             raise Exception(f"Variable {expr.children[0].value} not declared")
         return [Dict[expr.children[0].value], f"mov rax, [{expr.children[0].value}]"]
+
     elif expr.data == "nombre":
         return ["int", f"mov rax, {expr.children[0].value}"]
+
+    elif expr.data == "valeur":
+        return [Dict[expr.children[1].children[0].value], f"mov rax, [{expr.children[1].children[0].value}]"]
+
+    elif expr.data == "adresse":
+        print(expr)
+        return ["int", f"mov rax, {expr.children[0].value}"]
+
     elif expr.data == "binexpr":
         [type_e1,e1] = compile_expr(expr.children[0])
         [type_e2,e2] = compile_expr(expr.children[2])
@@ -133,7 +143,9 @@ def compile_expr(expr):
     
     elif expr.data == "malloc":
         [type_e1,e1] = compile_expr(expr.children[0])
-        return [type_e1,f"{e1}\nmov rdi, rax\ncall malloc\n"]
+        if type_e1!="int":
+            raise Exception("Incompatible type, needs int")
+        return ["int",f"{e1}\nmov rdi, rax\ncall malloc\n"]
 
 
     else:
@@ -152,15 +164,22 @@ def compile_cmd(cmd):
         lhs = cmd.children[0].value
         type_lhs=Dict[cmd.children[0].value]
         [type_rhs,rhs] = compile_expr(cmd.children[1])
-        if type_lhs != type_rhs:
+        if type_lhs != type_rhs and ("*" in "type_lhs" and "type_rhs"!="int"):
             raise Exception("Type mismatch")
-        return f"{rhs}\nmov [{lhs}],rax"
+        if "*" in type_lhs:
+            return f"{rhs}\nmov {lhs}, rax"
+        else:
+            return f"{rhs}\nmov [{lhs}],rax"
+
     if cmd.data == "assignment1":
-        lhs = cmd.children[0].value
-        rhs = compile_expr(cmd.children[1])
+        lhs = cmd.children[1].value
+        print(cmd.children[2].data)
+        [type_rhs,rhs] = compile_expr(cmd.children[2])
         return f"{rhs}\nmov [{lhs}],rax"
+
     elif cmd.data == "printf":
         return f"printf( {pp_expr(cmd.children[0])} );"
+
     elif cmd.data == "while":
         e = compile_expr(cmd.children[0])
         b = compile_bloc(cmd.children[1])
@@ -179,12 +198,14 @@ def compile_cmd(cmd):
 def compile_bloc(bloc):
     return "\n".join([compile_cmd(t) for t in bloc.children])
 
-prg = grammaire.parse("""int main(int X) {
-    int X;
-    X = X + 1;
-
+prg = grammaire.parse("""int* main(int X) {
+    int* X;
+    *X = 12;
+    X = 3;
     int Y;
-    Y = malloc(2+4);
+    Y = *X;
+    int Z;
+    Z = &Y;
 return(X); }""")
 #print(prg)
 #prg2 = pp_prg(prg)
