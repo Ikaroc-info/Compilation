@@ -127,7 +127,7 @@ def compile_expr(expr):
     
     elif expr.data == "malloc":
         e1 = compile_expr(expr.children[0])
-        return f"mov rdi, {e1}\ncall malloc\n"
+        return f"{e1}\nmov rdi, rax\ncall malloc\n"
 
 
     else:
@@ -143,6 +143,10 @@ def compile_vars(ast):
 def compile_cmd(cmd):
     global Dict
     if cmd.data == "assignment":
+        lhs = cmd.children[0].value
+        rhs = compile_expr(cmd.children[1])
+        return f"{rhs}\nmov [{lhs}],rax"
+    if cmd.data == "assignment1":
         lhs = cmd.children[0].value
         rhs = compile_expr(cmd.children[1])
         return f"{rhs}\nmov [{lhs}],rax"
@@ -166,10 +170,10 @@ def compile_bloc(bloc):
 
 prg = grammaire.parse("""int main(int X) {
     X = X + 1;
+    &Z = 12
 
     int Y;
-    str Z;
-    int h;
+    Y = malloc(2+4);
 return(X); }""")
 #print(prg)
 #prg2 = pp_prg(prg)
