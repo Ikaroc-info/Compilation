@@ -113,7 +113,6 @@ def compile(prg):
         return code
 
 def compile_expr(expr):
-    print(expr)
     if expr.data == "variable":
         if expr.children[0].value not in Dict.keys():
             raise Exception(f"Variable {expr.children[0].value} not declared")
@@ -123,11 +122,11 @@ def compile_expr(expr):
         return ["int", f"mov rax, {expr.children[0].value}"]
 
     elif expr.data == "valeur":
-        return [Dict[expr.children[1].children[0].value], f"mov rax, [{expr.children[1].children[0].value}]"]
+        return [Dict[expr.children[1].children[0].value], f"mov rbx, [{expr.children[1].children[0].value}]\nmov rax, [rbx]"]
 
     elif expr.data == "adresse":
         print(expr)
-        return ["int", f"mov rax, {expr.children[0].value}"]
+        return ["int", f"lea rax, [{expr.children[0].value}]"]
 
     elif expr.data == "binexpr":
         [type_e1,e1] = compile_expr(expr.children[0])
@@ -152,7 +151,6 @@ def compile_expr(expr):
         raise Exception("Not implemented")
 
 def compile_vars(ast):
-    print(ast.children[0].children[1])
     s=""
     for i in range(len(ast.children)):
         s +=f"mov rbx, [rbp-0x10]\nmov rdi,[rbx+{8*(i+1)}]\ncall atoi\nmov [{ast.children[i].children[1]}], rax\n"
@@ -166,16 +164,12 @@ def compile_cmd(cmd):
         [type_rhs,rhs] = compile_expr(cmd.children[1])
         if type_lhs != type_rhs and ("*" in "type_lhs" and "type_rhs"!="int"):
             raise Exception("Type mismatch")
-        if "*" in type_lhs:
-            return f"{rhs}\nmov {lhs}, rax"
-        else:
-            return f"{rhs}\nmov [{lhs}],rax"
+        return f"{rhs}\nmov [{lhs}], rax"
 
     if cmd.data == "assignment1":
         lhs = cmd.children[1].value
-        print(cmd.children[2].data)
         [type_rhs,rhs] = compile_expr(cmd.children[2])
-        return f"{rhs}\nmov [{lhs}],rax"
+        return f"{rhs}\nmov rbx, [{lhs}]\nmov [rbx],rax"
 
     elif cmd.data == "printf":
         return f"printf( {pp_expr(cmd.children[0])} );"
@@ -198,15 +192,13 @@ def compile_cmd(cmd):
 def compile_bloc(bloc):
     return "\n".join([compile_cmd(t) for t in bloc.children])
 
-prg = grammaire.parse("""int* main(int X) {
+prg = grammaire.parse("""int main(int a) {
     int* X;
+    X = malloc(4);
     *X = 12;
-    X = 3;
-    int Y;
-    Y = *X;
-    int Z;
-    Z = &Y;
-return(X); }""")
+    int y;
+    y = *X;
+return(y); }""")
 #print(prg)
 #prg2 = pp_prg(prg)
 #print(prg2)
