@@ -59,7 +59,7 @@ def pp_expr(expr):
 
 def pp_cmd(cmd):
     if cmd.data=="assignment":
-        lhs = cmd.children[0]#cmd.children[0].value
+        lhs = cmd.children[0]
         rhs = pp_expr(cmd.children[1])
         return f"{lhs} = {rhs};\n"
     elif cmd.data=="assignment1":
@@ -105,21 +105,27 @@ def compile(prg):
         code=f.read()
         var_decl="\n".join([f"{x} : dq 0" for x in var_list(prg)])
         code=code.replace("VAR_DECL",var_decl)
-        code=code.replace("RETURN",compile_expr(prg.children[3]))
         code=code.replace("BODY",compile_bloc(prg.children[2]))
         code = code.replace("VAR_INIT",compile_vars(prg.children[1]))
+        code=code.replace("RETURN",compile_expr(prg.children[3])[1])
+        if compile_expr(prg.children[3])[0]!=prg.children[0]:
+            raise Exception("Return type main mismatch")     
         return code
 
 def compile_expr(expr):
     if expr.data == "variable":
-        return f"mov rax, [{expr.children[0].value}]"
+        if expr.children[0].value not in Dict.keys():
+            raise Exception(f"Variable {expr.children[0].value} not declared")
+        return [Dict[expr.children[0].value], f"mov rax, [{expr.children[0].value}]"]
     elif expr.data == "nombre":
-        return f"mov rax, {expr.children[0].value}"
+        return ["int", f"mov rax, {expr.children[0].value}"]
     elif expr.data == "binexpr":
-        e1 = compile_expr(expr.children[0])
-        e2 = compile_expr(expr.children[2])
+        [type_e1,e1] = compile_expr(expr.children[0])
+        [type_e2,e2] = compile_expr(expr.children[2])
         op = expr.children[1].value
-        return f"{e2}\npush rax\n{e1}\npop rbx\n{op2asm[op]}"
+        if type_e1!=type_e2:
+            raise Exception("Incompatible types")
+        return [type_e1,f"{e2}\npush rax\n{e1}\npop rbx\n{op2asm[op]}"]
 
 
     elif expr.data == "parenexpr":
@@ -144,7 +150,10 @@ def compile_cmd(cmd):
     global Dict
     if cmd.data == "assignment":
         lhs = cmd.children[0].value
-        rhs = compile_expr(cmd.children[1])
+        type_lhs=Dict[cmd.children[0].value]
+        [type_rhs,rhs] = compile_expr(cmd.children[1])
+        if type_lhs != type_rhs:
+            raise Exception("Type mismatch")
         return f"{rhs}\nmov [{lhs}],rax"
     if cmd.data == "assignment1":
         lhs = cmd.children[0].value
@@ -158,6 +167,8 @@ def compile_cmd(cmd):
         index=next(cpt)
         return f"debut{index}:{e}\ncmp rax,0\njz fin{index}\n{b}\njmp debut{index}\nfin{index}:\n"
     elif cmd.data == "variable":
+        if cmd.children[0].children[1].value in Dict.keys():
+            raise Exception(f"Variable {cmd.children[0].children[1].value} already declared")
         Dict[cmd.children[0].children[1].value]=cmd.children[0].children[0].value
         print(Dict)
         return ""
@@ -179,4 +190,4 @@ return(X); }""")
 #prg2 = pp_prg(prg)
 #print(prg2)
 print(compile(prg))
-
+    
