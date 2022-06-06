@@ -5,6 +5,7 @@ grammaire = lark.Lark("""
 variables : typed_variable (","  typed_variable)*
 expr :  IDENTIFIANT -> variable | NUMBER -> nombre | "'" STR "'"-> str | "malloc" "(" expr ")" -> malloc | IDENTIFIANT ".cAt" "(" expr ")" -> cat 
 | expr OP expr -> binexpr | "(" expr ")" -> parenexpr | POINTER expr -> valeur | "&" IDENTIFIANT -> adresse | "len(" expr ")" -> len
+
 cmd : IDENTIFIANT "=" expr ";"-> assignment | POINTER IDENTIFIANT "=" expr ";"-> assignment1 |"while" "(" expr ")" "{" bloc "}" -> while
     | "if" "(" expr ")" "{" bloc "}" -> if | "printf" "(" expr ")" ";"-> printf | typed_variable ";" -> variable
 POINTER : /[*]+/
@@ -129,6 +130,12 @@ def compile_expr(expr):
 
     elif expr.data == "parenexpr":
         return compile_expr(expr.children[0])
+    
+    elif expr.data == "malloc":
+        e1 = compile_expr(expr.children[0])
+        return f"{e1}\nmov rdi, rax\ncall malloc\n"
+
+
     else:
         raise Exception("Not implemented")
 
@@ -147,6 +154,10 @@ def compile_cmd(cmd):
         [type_rhs,rhs] = compile_expr(cmd.children[1])
         if type_lhs != type_rhs:
             raise Exception("Type mismatch")
+        return f"{rhs}\nmov [{lhs}],rax"
+    if cmd.data == "assignment1":
+        lhs = cmd.children[0].value
+        rhs = compile_expr(cmd.children[1])
         return f"{rhs}\nmov [{lhs}],rax"
     elif cmd.data == "printf":
         return f"printf( {pp_expr(cmd.children[0])} );"
@@ -168,11 +179,13 @@ def compile_cmd(cmd):
 def compile_bloc(bloc):
     return "\n".join([compile_cmd(t) for t in bloc.children])
 
-prg = grammaire.parse("""str main(int X) {
-    str X;
-    str Z;
+prg = grammaire.parse("""int main(int X) {
+    X = X + 1;
+    &Z = 12
+
     int Y;
-return(Y); }""")
+    Y = malloc(2+4);
+return(X); }""")
 #print(prg)
 #prg2 = pp_prg(prg)
 #print(prg2)
