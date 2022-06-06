@@ -1,5 +1,8 @@
+from glob import glob
 import lark
 global Dict
+global strCpt 
+strCpt = -16
 Dict = {}
 grammaire = lark.Lark("""
 variables : typed_variable (","  typed_variable)*
@@ -105,6 +108,7 @@ def compile(prg):
         code=f.read()
         var_decl="\n".join([f"{x} : dq 0" for x in var_list(prg)])
         code=code.replace("VAR_DECL",var_decl)
+        code = code.replace("VAR_INIT",compile_vars(prg.children[1]))
         code=code.replace("BODY",compile_bloc(prg.children[2]))
         code = code.replace("VAR_INIT",compile_vars(prg.children[1]))
         code=code.replace("RETURN",compile_expr(prg.children[3])[1])
@@ -113,11 +117,12 @@ def compile(prg):
         return code
 
 def compile_expr(expr):
+    global Dict
+    global strCpt
     if expr.data == "variable":
         if expr.children[0].value not in Dict.keys():
             raise Exception(f"Variable {expr.children[0].value} not declared")
-        return [Dict[expr.children[0].value], f"mov rax, [{expr.children[0].value}]"]
-
+        return [Dict[expr.children[0].value]["type"], f"mov rax, [{expr.children[0].value}]"]
     elif expr.data == "nombre":
         return ["int", f"mov rax, {expr.children[0].value}"]
 
@@ -141,6 +146,13 @@ def compile_expr(expr):
             raise Exception("Incompatible types")
         return [type_e1,f"{e2}\npush rax\n{e1}\npop rbx\n{op2asm[op]}"]
 
+    elif expr.data == "cat":
+        [type_e2,e2] = compile_expr(expr.children[1])
+        if type_e2 != "int":
+            raise Exception("Incompatible types")
+            
+        a=Dict[expr.children[0].value]["pos"]
+        return ["int",f"{e2}\nmov rbx,{a}\n sub rbx,rax\nmov rcx,rbp\n add rcx , rbx\n movzx eax, BYTE [rcx]\n movsx eax, al\nmov DWORD [B], eax\nmov rax, [B]"]
 
     elif expr.data == "parenexpr":
         return compile_expr(expr.children[0])
@@ -152,25 +164,44 @@ def compile_expr(expr):
         return ["int",f"{e1}\nmov rdi, rax\ncall malloc\n"]
 
 
+    elif expr.data == "str":
+        strCpt -= 1
+        posStr = strCpt
+        s = ""
+        for i in range(len(expr.children[0].value)):
+            s += "mov byte [rbp "+str(strCpt)+"], "+ str(ord(expr.children[0].value[i])) +"\n"
+            strCpt -= 1
+        return ["str",{"type":"str","len":len(expr.children[0].value), "pos":posStr},s]
+    
     else:
         raise Exception("Not implemented")
 
 def compile_vars(ast):
     s=""
     for i in range(len(ast.children)):
+        Dict[ast.children[i].children[1].value] = {"type":ast.children[i].children[0].value}
         s +=f"mov rbx, [rbp-0x10]\nmov rdi,[rbx+{8*(i+1)}]\ncall atoi\nmov [{ast.children[i].children[1]}], rax\n"
     return s
 
 def compile_cmd(cmd):
     global Dict
-    if cmd.data == "assignment":
+    global strCpt
+    if cmd.data == "assignment" and Dict[cmd.children[0].value]["type"]=="int":
         lhs = cmd.children[0].value
-        type_lhs=Dict[cmd.children[0].value]
+        type_lhs=Dict[cmd.children[0].value]["type"]
         [type_rhs,rhs] = compile_expr(cmd.children[1])
         if type_lhs != type_rhs and ("*" in "type_lhs" and "type_rhs"!="int"):
             raise Exception("Type mismatch")
-        return f"{rhs}\nmov [{lhs}], rax"
+        return f"{rhs}\nmov [{lhs}],rax"
 
+    elif cmd.data == "assignment" and Dict[cmd.children[0].value]["type"]=="str":
+        lhs = cmd.children[0].value
+        [type_rhs,rhs,rtn] = compile_expr(cmd.children[1])
+        if "str" != type_rhs:
+            raise Exception("Type mismatch")
+        Dict[cmd.children[0].value] = rhs
+        return rtn
+      
     if cmd.data == "assignment1":
         lhs = cmd.children[1].value
         [type_rhs,rhs] = compile_expr(cmd.children[2])
@@ -192,8 +223,7 @@ def compile_cmd(cmd):
     elif cmd.data == "variable":
         if cmd.children[0].children[1].value in Dict.keys():
             raise Exception(f"Variable {cmd.children[0].children[1].value} already declared")
-        Dict[cmd.children[0].children[1].value]=cmd.children[0].children[0].value
-        print(Dict)
+        Dict[cmd.children[0].children[1].value]={"type":cmd.children[0].children[0].value}
         return ""
 
     else:
@@ -202,14 +232,12 @@ def compile_cmd(cmd):
 def compile_bloc(bloc):
     return "\n".join([compile_cmd(t) for t in bloc.children])
 
-prg = grammaire.parse("""int main(int a) {
-    int** X;
-    X = malloc(4);
-    *X = malloc(4);
-    **X = 12;
-    int y;
-    y = **X;
-return(y); }""")
+prg = grammaire.parse("""int main(int X) {
+    str B;
+    B = 'bac';
+    X = B.cAt(2);
+return(X); }""")
+
 #print(prg)
 #prg2 = pp_prg(prg)
 #print(prg2)
