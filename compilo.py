@@ -122,7 +122,12 @@ def compile_expr(expr):
         return ["int", f"mov rax, {expr.children[0].value}"]
 
     elif expr.data == "valeur":
-        return [Dict[expr.children[1].children[0].value], f"mov rbx, [{expr.children[1].children[0].value}]\nmov rax, [rbx]"]
+        rtn = f"mov rbx, [{expr.children[1].children[0].value}]\n"
+        nb = str(expr.children[0].value).count("*")
+        for i in range(nb-1):
+            rtn += f"mov rbx, [rbx]\n"
+        rtn += "mov rax, [rbx]"
+        return [Dict[expr.children[1].children[0].value],rtn]
 
     elif expr.data == "adresse":
         print(expr)
@@ -169,7 +174,12 @@ def compile_cmd(cmd):
     if cmd.data == "assignment1":
         lhs = cmd.children[1].value
         [type_rhs,rhs] = compile_expr(cmd.children[2])
-        return f"{rhs}\nmov rbx, [{lhs}]\nmov [rbx],rax"
+        rtn = f"{rhs}\nmov rbx, [{lhs}]\n"
+        nb = str(cmd.children[0].value).count("*")
+        for i in range(nb-1):
+            rtn += f"mov rbx, [rbx]\n"
+        rtn += f"mov [rbx], rax\n"
+        return rtn
 
     elif cmd.data == "printf":
         return f"printf( {pp_expr(cmd.children[0])} );"
@@ -193,11 +203,12 @@ def compile_bloc(bloc):
     return "\n".join([compile_cmd(t) for t in bloc.children])
 
 prg = grammaire.parse("""int main(int a) {
-    int* X;
+    int** X;
     X = malloc(4);
-    *X = 12;
+    *X = malloc(4);
+    **X = 12;
     int y;
-    y = *X;
+    y = **X;
 return(y); }""")
 #print(prg)
 #prg2 = pp_prg(prg)
