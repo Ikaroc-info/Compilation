@@ -256,7 +256,7 @@ def compile_cmd(cmd):
     elif cmd.data == "setcat":
         [type_e1,e1] = compile_expr(cmd.children[1])
         [type_e2,e2] = compile_expr(cmd.children[2])
-        if type_e2 != "int" or type_e1 != "int":
+        if symb_type(type_e2) != "int" or symb_type(type_e1) != "int":
             raise Exception("Incompatible types, needs int")
         return f"{e1}\nmov rbx,rax\nmov rax, [{cmd.children[0]}]\n add rbx,rax\n {e2}\n mov [rbx], al\n"
         
