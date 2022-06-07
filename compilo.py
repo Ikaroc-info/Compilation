@@ -18,13 +18,13 @@ typed_variable : BASIC_TYPE  IDENTIFIANT
 BASIC_TYPE : /(int|str)[*]*/
 STR : /[a-zA-Z0-9]+/
 NUMBER : /[0-9]+/
-OP : /[+\*>-]/
+OP : /([+\*-]|==|!=|>=|<=|>|<)/
 IDENTIFIANT : /[a-zA-Z][a-zA-Z0-9]*/
 %import common.WS
 %ignore WS
 """, start = "prog")
-cpt=iter(range(10000))
-op2asm={"+":"add rax,rbx","-":"sub rax,rbx"}
+cpt=iter(range(100000))
+op2asm={"+":"add rax,rbx","-":"sub rax,rbx","*":"imul rax,rbx",">":"cmp rax,rbx\njg ","<":"cmp rax,rbx\njl ","==":"cmp rax,rbx\nje ","!=":"cmp rax,rbx\njne ",">=":"cmp rax,rbx\njge ","<=":"cmp rax,rbx\njle "}
 
 def pp_variables(vars):
     return ", ".join([f"{t.children[0]} {t.children[1]}" for t in vars.children])
@@ -112,7 +112,7 @@ def compile(prg):
         code=code.replace("BODY",compile_bloc(prg.children[2]))
         code = code.replace("VAR_INIT",compile_vars(prg.children[1]))
         code=code.replace("RETURN",compile_expr(prg.children[3])[1])
-        if compile_expr(prg.children[3])[0]!=prg.children[0]:
+        if symb_type(compile_expr(prg.children[3])[0])!=symb_type(prg.children[0]):
             raise Exception("Return type main mismatch")     
         return code
 
@@ -132,7 +132,7 @@ def compile_expr(expr):
         for i in range(nb-1):
             rtn += f"mov rbx, [rbx]\n"
         rtn += "mov rax, [rbx]"
-        return [Dict[expr.children[1].children[0].value],rtn]
+        return [Dict[expr.children[1].children[0].value]["type"],rtn]
 
     elif expr.data == "adresse":
         return ["int", f"lea rax, [{expr.children[0].value}]"]
@@ -141,10 +141,15 @@ def compile_expr(expr):
         [type_e1,e1] = compile_expr(expr.children[0])
         [type_e2,e2] = compile_expr(expr.children[2])
         op = expr.children[1].value
-        if type_e1!=type_e2:
+        if symb_type(type_e1)!=symb_type(type_e2):
             raise Exception("Incompatible types")
+            
         if type_e1=="int":
-            return [type_e1,f"{e2}\npush rax\n{e1}\npop rbx\n{op2asm[op]}"]
+            if op in "+-*/":
+                return [type_e1,f"{e2}\npush rax\n{e1}\npop rbx\n{op2asm[op]}"]
+            elif op in {"<",">","<=",">=","==","!="}:
+                index=next(cpt)
+                return [type_e1,f"{e2}\npush rax\n{e1}\npop rbx\n{op2asm[op]}"+f"conditionv{index}\nmov rax,0\njmp fincond{index}\nconditionv{index} :mov rax,1\nfincond{index} : cmp rax,rax"]
         else:
             index = next(cpt)
             index = next(cpt)
@@ -201,7 +206,7 @@ def compile_cmd(cmd):
         lhs = cmd.children[0].value
         type_lhs=Dict[cmd.children[0].value]["type"]
         [type_rhs,rhs] = compile_expr(cmd.children[1])
-        if type_lhs != type_rhs and ("*" in "type_lhs" and "type_rhs"!="int"):
+        if type_rhs != "int" and "*" not in type_rhs:
             raise Exception("Type mismatch")
         return f"{rhs}\nmov [{lhs}],rax"
       
@@ -216,7 +221,7 @@ def compile_cmd(cmd):
         return rtn
 
     elif cmd.data == "printf":
-        return f"printf( {pp_expr(cmd.children[0])} );"
+        return f"{compile_expr(cmd.children[0])[1]}\nmov rdi, fmt\nmov rsi,rax\nxor rax,rax\ncall printf"
 
     elif cmd.data == "while":
         e = compile_expr(cmd.children[0])
@@ -235,6 +240,14 @@ def compile_cmd(cmd):
 def compile_bloc(bloc):
     return "\n".join([compile_cmd(t) for t in bloc.children])
 
+def symb_type(type_):
+    if type_ == "int" or "*" in type_:
+        return "int"
+    elif type_ == "str":
+        return "str"
+    else:
+        raise Exception("Not implemented")
+
 prg = grammaire.parse("""int main(int X) {
     str B;
     B = 'ab';
@@ -242,11 +255,15 @@ prg = grammaire.parse("""int main(int X) {
     C = 'cde';
     B = B+C;
     X = B.cAt(X);
- 
+    printf(1==1);
+    printf(0==1);
+    printf(2>=1);
+    printf(0>=1);
+    printf(3<4);
+    printf(0>1);
 return(X); }""")
 
 #print(prg)
 #prg2 = pp_prg(prg)
 #print(prg2)
 print(compile(prg))
-    
