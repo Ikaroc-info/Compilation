@@ -8,10 +8,10 @@ Dict = {}
 grammaire = lark.Lark("""
 variables : typed_variable (","  typed_variable)*
 expr :  IDENTIFIANT -> variable | NUMBER -> nombre | "'" STR "'"-> str | "malloc" "(" expr ")" -> malloc | IDENTIFIANT ".cAt" "(" expr ")" -> cat 
-| expr OP expr -> binexpr | "(" expr ")" -> parenexpr | POINTER expr -> valeur | "&" IDENTIFIANT -> adresse | "len(" expr ")" -> len
+| expr OP expr -> binexpr | "(" expr ")" -> parenexpr | POINTER expr -> valeur | "&" IDENTIFIANT -> adresse | "len(" expr ")" -> len 
 
 cmd : IDENTIFIANT "=" expr ";"-> assignment | POINTER IDENTIFIANT "=" expr ";"-> assignment1 |"while" "(" expr ")" "{" bloc "}" -> while
-    | "if" "(" expr ")" "{" bloc "}" -> if | "printf" "(" expr ")" ";"-> printf | typed_variable ";" -> variable
+    | "if" "(" expr ")" "{" bloc "}" -> if | "printf" "(" expr ")" ";"-> printf | typed_variable ";" -> variable | IDENTIFIANT ".setcAt(" expr "," expr ")"";" -> setcat
 POINTER : /[*]+/
 bloc : (cmd)*
 prog : BASIC_TYPE "main" "(" variables ")" "{" bloc "return" "(" expr ")" ";" "}"
@@ -49,7 +49,11 @@ def pp_expr(expr):
         return f" {expr.children[0]}.cAt({e1})"
     elif expr.data == "len":
         e1 = pp_expr(expr.children[0])
-        return f" len({e1})"
+        return f"len({e1})"
+    elif expr.data == "setcat":
+        e1 = pp_expr(expr.children[1])
+        e2 = pp_expr(expr.children[2])
+        return f"{expr.children[0]}.cAt({e1},{e2})"
     elif expr.data == "binexpr":
         e1 = pp_expr(expr.children[0])
         e2 = pp_expr(expr.children[2])
@@ -153,19 +157,29 @@ def compile_expr(expr):
                 index=next(cpt)
                 return [type_e1,f"{e2}\npush rax\n{e1}\npop rbx\n{op2asm[op]}"+f"conditionv{index}\nmov rax,0\njmp fincond{index}\nconditionv{index} :mov rax,1\nfincond{index} : cmp rax,rax"]
         elif type_e1=="str":
-            index = next(cpt)
-            index = next(cpt)
-            index = next(cpt)
-            index = next(cpt)
-            return [type_e1,f"{e1}\n mov rbx ,0\ndebut{index-1}:\n cmp byte [rax+rbx],0\n je fin{index-1}\n inc rbx\n jmp debut{index-1}\n fin{index-1}:\n mov rax,rbx\npush rax\n{e2}\n mov rbx ,0\ndebut{index}:\n cmp byte [rax+rbx],0\n je fin{index}\n inc rbx\n jmp debut{index}\n fin{index}:\n mov rax,rbx\npop rbx\nadd rax,rbx\ninc rax\nmov rdi,rax\ncall malloc\nmov rdx,rax\n push rax\n\
-            {e1}\n mov rbx ,0\ndebut{index-2}:\n cmp byte [rax+rbx],0\n je fin{index-2}\nmov rcx,[rax+rbx]\nmov [rdx+rbx],rcx \ninc rbx\n jmp debut{index-2}\n fin{index-2}:\nadd rdx,rbx\
-                \n{e2}\n mov rbx ,0\ndebut{index-3}:\n cmp byte [rax+rbx],0\n je fin{index-3}\nmov rcx,[rax+rbx]\nmov [rbx+rdx],rcx \ninc rbx\n jmp debut{index-3}\n fin{index-3}:\nmov rcx,[rax+rbx+1]\nmov [rdx + rbx+1],rcx\npop rax\n"]
+
+            if op == "+":
+                index = next(cpt)
+                index = next(cpt)
+                index = next(cpt)
+                index = next(cpt)
+                return [type_e1,f"{e1}\n mov rbx ,0\ndebut{index-1}:\n cmp byte [rax+rbx],0\n je fin{index-1}\n inc rbx\n jmp debut{index-1}\n fin{index-1}:\n mov rax,rbx\npush rax\n{e2}\n mov rbx ,0\ndebut{index}:\n cmp byte [rax+rbx],0\n je fin{index}\n inc rbx\n jmp debut{index}\n fin{index}:\n mov rax,rbx\npop rbx\nadd rax,rbx\ninc rax\nmov rdi,rax\ncall malloc\nmov rdx,rax\n push rax\n\
+                {e1}\n mov rbx ,0\ndebut{index-2}:\n cmp byte [rax+rbx],0\n je fin{index-2}\nmov rcx,[rax+rbx]\nmov [rdx+rbx],rcx \ninc rbx\n jmp debut{index-2}\n fin{index-2}:\nadd rdx,rbx\
+                    \n{e2}\n mov rbx ,0\ndebut{index-3}:\n cmp byte [rax+rbx],0\n je fin{index-3}\nmov rcx,[rax+rbx]\nmov [rbx+rdx],rcx \ninc rbx\n jmp debut{index-3}\n fin{index-3}:\nmov rcx,[rax+rbx+1]\nmov [rdx + rbx+1],rcx\npop rax\n"]
+            elif op == "==":
+                index = next(cpt)
+                index = next(cpt)
+                index = next(cpt)
+                return ["int",f"{e1}\nmov rbx, rax\n{e2}\nmov rcx, 0\ndebut{index}:\nmov rdx, [rax+rcx]\ncmp [rbx+rcx], rdx\njne fin{index-1}\ncmp byte [rbx+rcx],0\nje fin{index}\ninc rcx\njmp debut{index}\nfin{index}:\nmov rax, 1\njmp fin{index-2}\nfin{index-1}:\nmov rax, 0\nfin{index-2}:\n"]
+            else:
+                raise Exception("Invalid operator (only + and == for type str)")
 
     elif expr.data == "cat":
         [type_e2,e2] = compile_expr(expr.children[1])
         if symb_type(type_e2) != "int":
             raise Exception(f".cAt() take only int as argument, not {type_e2}")
         return ["int",f"{e2}\nmov rbx,rax\nmov rax, [{expr.children[0]}]\nadd rbx,rax\n movzx eax, BYTE [rbx]\n movsx eax, al\nmov DWORD [_A], eax\nmov rax, [_A]"]
+
 
     elif expr.data == "parenexpr":
         return compile_expr(expr.children[0])
@@ -239,6 +253,14 @@ def compile_cmd(cmd):
         Dict[cmd.children[0].children[1].value]={"type":cmd.children[0].children[0].value}
         return ""
 
+    elif cmd.data == "setcat":
+        [type_e1,e1] = compile_expr(cmd.children[1])
+        [type_e2,e2] = compile_expr(cmd.children[2])
+        if type_e2 != "int" or type_e1 != "int":
+            raise Exception("Incompatible types, needs int")
+        return f"{e1}\nmov rbx,rax\nmov rax, [{cmd.children[0]}]\n add rbx,rax\n {e2}\n mov [rbx], al\n"
+        
+
     else:
         raise Exception("Not implemented")
 
@@ -265,6 +287,7 @@ for ligne in lignes:
 prg = grammaire.parse(code)
 
 if mod == "cp":
+
     print(compile(prg))
 elif mod ==  "pp":
     print(pp_prg(prg))
