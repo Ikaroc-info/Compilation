@@ -163,7 +163,7 @@ def compile_expr(expr):
         [type_e2,e2] = compile_expr(expr.children[1])
         if type_e2 != "int":
             raise Exception("Incompatible types")
-        return ["int",f"{e2}\nmov rbx,rax\nmov rax, [{expr.children[0]}]\nadd rbx,rax\n movzx eax, BYTE [rbx]\n movsx eax, al\nmov DWORD [A], eax\nmov rax, [A]"]
+        return ["int",f"{e2}\nmov rbx,rax\nmov rax, [{expr.children[0]}]\nadd rbx,rax\n movzx eax, BYTE [rbx]\n movsx eax, al\nmov DWORD [_A], eax\nmov rax, [_A]"]
 
     elif expr.data == "parenexpr":
         return compile_expr(expr.children[0])
@@ -206,7 +206,7 @@ def compile_cmd(cmd):
         lhs = cmd.children[0].value
         type_lhs=Dict[cmd.children[0].value]["type"]
         [type_rhs,rhs] = compile_expr(cmd.children[1])
-        if type_rhs != "int" and "*" not in type_rhs:
+        if symb_type(type_lhs)!=symb_type(type_rhs):
             raise Exception("Type mismatch")
         return f"{rhs}\nmov [{lhs}],rax"
       
