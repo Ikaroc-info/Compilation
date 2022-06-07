@@ -135,7 +135,6 @@ def compile_expr(expr):
         return [Dict[expr.children[1].children[0].value],rtn]
 
     elif expr.data == "adresse":
-        print(expr)
         return ["int", f"lea rax, [{expr.children[0].value}]"]
 
     elif expr.data == "binexpr":
@@ -144,15 +143,22 @@ def compile_expr(expr):
         op = expr.children[1].value
         if type_e1!=type_e2:
             raise Exception("Incompatible types")
-        return [type_e1,f"{e2}\npush rax\n{e1}\npop rbx\n{op2asm[op]}"]
+        if type_e1=="int":
+            return [type_e1,f"{e2}\npush rax\n{e1}\npop rbx\n{op2asm[op]}"]
+        else:
+            index = next(cpt)
+            index = next(cpt)
+            index = next(cpt)
+            index = next(cpt)
+            return [type_e1,f"{e1}\n mov rbx ,0\ndebut{index-1}:\n cmp byte [rax+rbx],0\n je fin{index-1}\n inc rbx\n jmp debut{index-1}\n fin{index-1}:\n mov rax,rbx\npush rax\n{e2}\n mov rbx ,0\ndebut{index}:\n cmp byte [rax+rbx],0\n je fin{index}\n inc rbx\n jmp debut{index}\n fin{index}:\n mov rax,rbx\npop rbx\nadd rax,rbx\ninc rax\nmov rdi,rax\ncall malloc\nmov rdx,rax\n push rax\n\
+            {e1}\n mov rbx ,0\ndebut{index-2}:\n cmp byte [rax+rbx],0\n je fin{index-2}\nmov rcx,[rax+rbx]\nmov [rdx+rbx],rcx \ninc rbx\n jmp debut{index-2}\n fin{index-2}:\nadd rdx,rbx\
+                \n{e2}\n mov rbx ,0\ndebut{index-3}:\n cmp byte [rax+rbx],0\n je fin{index-3}\nmov rcx,[rax+rbx]\nmov [rbx+rdx],rcx \ninc rbx\n jmp debut{index-3}\n fin{index-3}:\nmov rcx,[rax+rbx+1]\nmov [rdx + rbx+1],rcx\npop rax\n"]
 
     elif expr.data == "cat":
         [type_e2,e2] = compile_expr(expr.children[1])
         if type_e2 != "int":
             raise Exception("Incompatible types")
-            
-        a=Dict[expr.children[0].value]["pos"]
-        return ["int",f"{e2}\nmov rbx,{a}\n sub rbx,rax\nmov rcx,rbp\n add rcx , rbx\n movzx eax, BYTE [rcx]\n movsx eax, al\nmov DWORD [B], eax\nmov rax, [B]"]
+        return ["int",f"{e2}\nmov rbx,rax\nmov rax, [{expr.children[0]}]\nadd rbx,rax\n movzx eax, BYTE [rbx]\n movsx eax, al\nmov DWORD [A], eax\nmov rax, [A]"]
 
     elif expr.data == "parenexpr":
         return compile_expr(expr.children[0])
@@ -165,13 +171,18 @@ def compile_expr(expr):
 
 
     elif expr.data == "str":
-        strCpt -= 1
-        posStr = strCpt
-        s = ""
+        s = f"mov rdi, {len(expr.children[0].value)+1}\ncall malloc\n"
         for i in range(len(expr.children[0].value)):
-            s += "mov byte [rbp "+str(strCpt)+"], "+ str(ord(expr.children[0].value[i])) +"\n"
-            strCpt -= 1
-        return ["str",{"type":"str","len":len(expr.children[0].value), "pos":posStr},s]
+            s += f"mov byte [rax +{i}], {ord(expr.children[0].value[i])} \n"
+        s += f"mov byte [rax + {len(expr.children[0].value)} ], 0\n"
+        return ["str",s]
+
+    elif expr.data == "len":
+        [type_e2,e2] = compile_expr(expr.children[0])
+        if type_e2 != "str":
+            raise Exception("Incompatible type, needs str")
+        index = next(cpt)
+        return ["int",f"{e2}\n mov rbx ,0\ndebut{index}:\n cmp byte [rax+rbx],0\n je fin{index}\n inc rbx\n jmp debut{index}\n fin{index}:\n mov rax,rbx\n"]
     
     else:
         raise Exception("Not implemented")
@@ -186,21 +197,13 @@ def compile_vars(ast):
 def compile_cmd(cmd):
     global Dict
     global strCpt
-    if cmd.data == "assignment" and Dict[cmd.children[0].value]["type"]=="int":
+    if cmd.data == "assignment":
         lhs = cmd.children[0].value
         type_lhs=Dict[cmd.children[0].value]["type"]
         [type_rhs,rhs] = compile_expr(cmd.children[1])
         if type_lhs != type_rhs and ("*" in "type_lhs" and "type_rhs"!="int"):
             raise Exception("Type mismatch")
         return f"{rhs}\nmov [{lhs}],rax"
-
-    elif cmd.data == "assignment" and Dict[cmd.children[0].value]["type"]=="str":
-        lhs = cmd.children[0].value
-        [type_rhs,rhs,rtn] = compile_expr(cmd.children[1])
-        if "str" != type_rhs:
-            raise Exception("Type mismatch")
-        Dict[cmd.children[0].value] = rhs
-        return rtn
       
     if cmd.data == "assignment1":
         lhs = cmd.children[1].value
@@ -234,8 +237,12 @@ def compile_bloc(bloc):
 
 prg = grammaire.parse("""int main(int X) {
     str B;
-    B = 'bac';
-    X = B.cAt(2);
+    B = 'ab';
+    str C;
+    C = 'cde';
+    B = B+C;
+    X = B.cAt(X);
+ 
 return(X); }""")
 
 #print(prg)
