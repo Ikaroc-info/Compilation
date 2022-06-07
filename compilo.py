@@ -264,7 +264,7 @@ for ligne in lignes:
     code += ligne
 prg = grammaire.parse(code)
 
-if mod == "compile":
+if mod == "cp":
     print(compile(prg))
 elif mod ==  "pp":
     print(pp_prg(prg))
