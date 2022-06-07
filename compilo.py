@@ -1,3 +1,4 @@
+import sys
 from glob import glob
 import lark
 global Dict
@@ -37,23 +38,23 @@ def pp_expr(expr):
         return f"'{expr.children[0].value}'"
     elif expr.data == "valeur":
         e1 = pp_expr(expr.children[0])
-        return f"*{e1}"
+        return f" *{e1}"
     elif expr.data == "adresse":
-        return f"&{expr.children[0].value}"
+        return f" &{expr.children[0].value}"
     elif expr.data == "malloc":
         e1 = pp_expr(expr.children[0])
-        return f"malloc({e1})"
+        return f" malloc({e1})"
     elif expr.data == "cat":
         e1 = pp_expr(expr.children[1])
-        return f"{expr.children[0]}.cAt({e1})"
+        return f" {expr.children[0]}.cAt({e1})"
     elif expr.data == "len":
         e1 = pp_expr(expr.children[0])
-        return f"len({e1})"
+        return f" len({e1})"
     elif expr.data == "binexpr":
         e1 = pp_expr(expr.children[0])
         e2 = pp_expr(expr.children[2])
         op = expr.children[1].value
-        return f"{e1} {op} {e2}"
+        return f" {e1} {op} {e2}"
     elif expr.data == "parenexpr":
         return f"({pp_expr(expr.children[0])})"
     else:
@@ -64,19 +65,19 @@ def pp_cmd(cmd):
     if cmd.data=="assignment":
         lhs = cmd.children[0]
         rhs = pp_expr(cmd.children[1])
-        return f"{lhs} = {rhs};\n"
+        return f" {lhs} = {rhs};\n"
     elif cmd.data=="assignment1":
         lhs=cmd.children[0]+cmd.children[1]
         rhs=pp_expr(cmd.children[2])
-        return f"{lhs} = {rhs};\n"
+        return f" {lhs} = {rhs};\n"
     elif cmd.data == "printf":
-        return f"printf( {pp_expr(cmd.children[0])} );\n"
+        return f" printf( {pp_expr(cmd.children[0])} );\n"
     elif cmd.data in {"while", "if"}:
         e = pp_expr(cmd.children[0])
         b = pp_bloc(cmd.children[1])
-        return f"{cmd.data} ({e}) {{ {b}}}"
+        return f" {cmd.data} ({e}) {{ {b}}}"
     elif cmd.data == "variable":
-        return f"{cmd.children[0].children[0]} {cmd.children[0].children[1]};"
+        return f" {cmd.children[0].children[0]} {cmd.children[0].children[1]};"
     else:
         raise Exception("Not implemented")
 
@@ -90,7 +91,7 @@ def pp_prg(prog):
     vars = pp_variables(prog.children[1])
     bloc = pp_bloc(prog.children[2])
     ret = pp_expr(prog.children[3])
-    return f"{type_fct} main ({vars}){{\n {bloc} return ({ret});\n}}"
+    return f"{type_fct} main ({vars}){{\n{bloc} return ({ret});\n}}"
 
 def var_list(ast):
     if isinstance(ast, lark.Token):
@@ -127,6 +128,8 @@ def compile_expr(expr):
         return ["int", f"mov rax, {expr.children[0].value}"]
 
     elif expr.data == "valeur":
+        if expr.children[1].children[0].value not in Dict.keys():
+            raise Exception(f"Variable {expr.children[1].children[0].value} not declared")
         rtn = f"mov rbx, [{expr.children[1].children[0].value}]\n"
         nb = str(expr.children[0].value).count("*")
         for i in range(nb-1):
@@ -142,15 +145,14 @@ def compile_expr(expr):
         [type_e2,e2] = compile_expr(expr.children[2])
         op = expr.children[1].value
         if symb_type(type_e1)!=symb_type(type_e2):
-            raise Exception("Incompatible types")
-            
+            raise Exception("Incompatible types")  
         if type_e1=="int":
             if op in "+-*/":
                 return [type_e1,f"{e2}\npush rax\n{e1}\npop rbx\n{op2asm[op]}"]
             elif op in {"<",">","<=",">=","==","!="}:
                 index=next(cpt)
                 return [type_e1,f"{e2}\npush rax\n{e1}\npop rbx\n{op2asm[op]}"+f"conditionv{index}\nmov rax,0\njmp fincond{index}\nconditionv{index} :mov rax,1\nfincond{index} : cmp rax,rax"]
-        else:
+        elif type_e1=="str":
             index = next(cpt)
             index = next(cpt)
             index = next(cpt)
@@ -161,8 +163,8 @@ def compile_expr(expr):
 
     elif expr.data == "cat":
         [type_e2,e2] = compile_expr(expr.children[1])
-        if type_e2 != "int":
-            raise Exception("Incompatible types")
+        if symb_type(type_e2) != "int":
+            raise Exception(f".cAt() take only int as argument, not {type_e2}")
         return ["int",f"{e2}\nmov rbx,rax\nmov rax, [{expr.children[0]}]\nadd rbx,rax\n movzx eax, BYTE [rbx]\n movsx eax, al\nmov DWORD [_A], eax\nmov rax, [_A]"]
 
     elif expr.data == "parenexpr":
@@ -170,8 +172,8 @@ def compile_expr(expr):
     
     elif expr.data == "malloc":
         [type_e1,e1] = compile_expr(expr.children[0])
-        if type_e1!="int":
-            raise Exception("Incompatible type, needs int")
+        if symb_type(type_e1)!="int":
+            raise Exception(f"malloc() take only int as argument, not {type_e1}")
         return ["int",f"{e1}\nmov rdi, rax\ncall malloc\n"]
 
 
@@ -183,11 +185,11 @@ def compile_expr(expr):
         return ["str",s]
 
     elif expr.data == "len":
-        [type_e2,e2] = compile_expr(expr.children[0])
-        if type_e2 != "str":
-            raise Exception("Incompatible type, needs str")
+        [type_e1,e1] = compile_expr(expr.children[0])
+        if type_e1 != "str":
+            raise Exception(f"len() takes only str as argument, not{type_e1}")
         index = next(cpt)
-        return ["int",f"{e2}\n mov rbx ,0\ndebut{index}:\n cmp byte [rax+rbx],0\n je fin{index}\n inc rbx\n jmp debut{index}\n fin{index}:\n mov rax,rbx\n"]
+        return ["int",f"{e1}\n mov rbx ,0\ndebut{index}:\n cmp byte [rax+rbx],0\n je fin{index}\n inc rbx\n jmp debut{index}\n fin{index}:\n mov rax,rbx\n"]
     
     else:
         raise Exception("Not implemented")
@@ -207,14 +209,17 @@ def compile_cmd(cmd):
         type_lhs=Dict[cmd.children[0].value]["type"]
         [type_rhs,rhs] = compile_expr(cmd.children[1])
         if symb_type(type_lhs)!=symb_type(type_rhs):
-            raise Exception("Type mismatch")
+            raise Exception(f"Incompatible types in assignment, {type_lhs} and {type_rhs} are not assignable")
         return f"{rhs}\nmov [{lhs}],rax"
       
     if cmd.data == "assignment1":
         lhs = cmd.children[1].value
+        type_lhs=Dict[cmd.children[1]]["type"]
         [type_rhs,rhs] = compile_expr(cmd.children[2])
         rtn = f"{rhs}\nmov rbx, [{lhs}]\n"
         nb = str(cmd.children[0].value).count("*")
+        if symb_type(type_lhs)!=symb_type(type_rhs):
+            raise Exception(f"Incompatible types in assignment, {type_lhs} and {type_rhs} are not assignable")
         for i in range(nb-1):
             rtn += f"mov rbx, [rbx]\n"
         rtn += f"mov [rbx], rax\n"
@@ -246,24 +251,21 @@ def symb_type(type_):
     elif type_ == "str":
         return "str"
     else:
-        raise Exception("Not implemented")
+        raise Exception(f"Type {type_} not implemented")
 
-prg = grammaire.parse("""int main(int X) {
-    str B;
-    B = 'ab';
-    str C;
-    C = 'cde';
-    B = B+C;
-    X = B.cAt(X);
-    printf(1==1);
-    printf(0==1);
-    printf(2>=1);
-    printf(0>=1);
-    printf(3<4);
-    printf(0>1);
-return(X); }""")
 
-#print(prg)
-#prg2 = pp_prg(prg)
-#print(prg2)
-print(compile(prg))
+fichier_source=sys.argv[1]
+mod=sys.argv[2]
+filin = open(fichier_source, "r")
+lignes = filin.readlines()
+filin.close()
+code=""
+for ligne in lignes:
+    code += ligne
+prg = grammaire.parse(code)
+
+if mod == "compile":
+    print(compile(prg))
+elif mod ==  "pp":
+    print(pp_prg(prg))
+
