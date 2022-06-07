@@ -8,10 +8,10 @@ Dict = {}
 grammaire = lark.Lark("""
 variables : typed_variable (","  typed_variable)*
 expr :  IDENTIFIANT -> variable | NUMBER -> nombre | "'" STR "'"-> str | "malloc" "(" expr ")" -> malloc | IDENTIFIANT ".cAt" "(" expr ")" -> cat 
-| expr OP expr -> binexpr | "(" expr ")" -> parenexpr | POINTER expr -> valeur | "&" IDENTIFIANT -> adresse | "len(" expr ")" -> len
+| expr OP expr -> binexpr | "(" expr ")" -> parenexpr | POINTER expr -> valeur | "&" IDENTIFIANT -> adresse | "len(" expr ")" -> len 
 
 cmd : IDENTIFIANT "=" expr ";"-> assignment | POINTER IDENTIFIANT "=" expr ";"-> assignment1 |"while" "(" expr ")" "{" bloc "}" -> while
-    | "if" "(" expr ")" "{" bloc "}" -> if | "printf" "(" expr ")" ";"-> printf | typed_variable ";" -> variable
+    | "if" "(" expr ")" "{" bloc "}" -> if | "printf" "(" expr ")" ";"-> printf | typed_variable ";" -> variable | IDENTIFIANT ".setcAt(" expr "," expr ")"";" -> setcat
 POINTER : /[*]+/
 bloc : (cmd)*
 prog : BASIC_TYPE "main" "(" variables ")" "{" bloc "return" "(" expr ")" ";" "}"
@@ -49,7 +49,11 @@ def pp_expr(expr):
         return f" {expr.children[0]}.cAt({e1})"
     elif expr.data == "len":
         e1 = pp_expr(expr.children[0])
-        return f" len({e1})"
+        return f"len({e1})"
+    elif expr.data == "setcat":
+        e1 = pp_expr(expr.children[1])
+        e2 = pp_expr(expr.children[2])
+        return f"{expr.children[0]}.cAt({e1},{e2})"
     elif expr.data == "binexpr":
         e1 = pp_expr(expr.children[0])
         e2 = pp_expr(expr.children[2])
@@ -167,6 +171,7 @@ def compile_expr(expr):
             raise Exception(f".cAt() take only int as argument, not {type_e2}")
         return ["int",f"{e2}\nmov rbx,rax\nmov rax, [{expr.children[0]}]\nadd rbx,rax\n movzx eax, BYTE [rbx]\n movsx eax, al\nmov DWORD [_A], eax\nmov rax, [_A]"]
 
+
     elif expr.data == "parenexpr":
         return compile_expr(expr.children[0])
     
@@ -239,6 +244,14 @@ def compile_cmd(cmd):
         Dict[cmd.children[0].children[1].value]={"type":cmd.children[0].children[0].value}
         return ""
 
+    elif cmd.data == "setcat":
+        [type_e1,e1] = compile_expr(cmd.children[1])
+        [type_e2,e2] = compile_expr(cmd.children[2])
+        if type_e2 != "int" or type_e1 != "int":
+            raise Exception("Incompatible types, needs int")
+        return f"{e1}\nmov rbx,rax\nmov rax, [{cmd.children[0]}]\n add rbx,rax\n {e2}\n mov [rbx], al\n"
+        
+
     else:
         raise Exception("Not implemented")
 
@@ -268,4 +281,3 @@ if mod == "compile":
     print(compile(prg))
 elif mod ==  "pp":
     print(pp_prg(prg))
-
