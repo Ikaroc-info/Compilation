@@ -150,15 +150,22 @@ def compile_expr(expr):
             elif op in {"<",">","<=",">=","==","!="}:
                 index=next(cpt)
                 return [type_e1,f"{e2}\npush rax\n{e1}\npop rbx\n{op2asm[op]}"+f"conditionv{index}\nmov rax,0\njmp fincond{index}\nconditionv{index} :mov rax,1\nfincond{index} : cmp rax,rax"]
-        else:
-            index = next(cpt)
-            index = next(cpt)
-            index = next(cpt)
-            index = next(cpt)
-            return [type_e1,f"{e1}\n mov rbx ,0\ndebut{index-1}:\n cmp byte [rax+rbx],0\n je fin{index-1}\n inc rbx\n jmp debut{index-1}\n fin{index-1}:\n mov rax,rbx\npush rax\n{e2}\n mov rbx ,0\ndebut{index}:\n cmp byte [rax+rbx],0\n je fin{index}\n inc rbx\n jmp debut{index}\n fin{index}:\n mov rax,rbx\npop rbx\nadd rax,rbx\ninc rax\nmov rdi,rax\ncall malloc\nmov rdx,rax\n push rax\n\
-            {e1}\n mov rbx ,0\ndebut{index-2}:\n cmp byte [rax+rbx],0\n je fin{index-2}\nmov rcx,[rax+rbx]\nmov [rdx+rbx],rcx \ninc rbx\n jmp debut{index-2}\n fin{index-2}:\nadd rdx,rbx\
-                \n{e2}\n mov rbx ,0\ndebut{index-3}:\n cmp byte [rax+rbx],0\n je fin{index-3}\nmov rcx,[rax+rbx]\nmov [rbx+rdx],rcx \ninc rbx\n jmp debut{index-3}\n fin{index-3}:\nmov rcx,[rax+rbx+1]\nmov [rdx + rbx+1],rcx\npop rax\n"]
-
+        elif type_e1=="str":
+            if op == "+":
+                index = next(cpt)
+                index = next(cpt)
+                index = next(cpt)
+                index = next(cpt)
+                return [type_e1,f"{e1}\n mov rbx ,0\ndebut{index-1}:\n cmp byte [rax+rbx],0\n je fin{index-1}\n inc rbx\n jmp debut{index-1}\n fin{index-1}:\n mov rax,rbx\npush rax\n{e2}\n mov rbx ,0\ndebut{index}:\n cmp byte [rax+rbx],0\n je fin{index}\n inc rbx\n jmp debut{index}\n fin{index}:\n mov rax,rbx\npop rbx\nadd rax,rbx\ninc rax\nmov rdi,rax\ncall malloc\nmov rdx,rax\n push rax\n\
+                {e1}\n mov rbx ,0\ndebut{index-2}:\n cmp byte [rax+rbx],0\n je fin{index-2}\nmov rcx,[rax+rbx]\nmov [rdx+rbx],rcx \ninc rbx\n jmp debut{index-2}\n fin{index-2}:\nadd rdx,rbx\
+                    \n{e2}\n mov rbx ,0\ndebut{index-3}:\n cmp byte [rax+rbx],0\n je fin{index-3}\nmov rcx,[rax+rbx]\nmov [rbx+rdx],rcx \ninc rbx\n jmp debut{index-3}\n fin{index-3}:\nmov rcx,[rax+rbx+1]\nmov [rdx + rbx+1],rcx\npop rax\n"]
+            elif op == "==":
+                index = next(cpt)
+                index = next(cpt)
+                index = next(cpt)
+                return ["int",f"{e1}\nmov rbx, rax\n{e2}\nmov rcx, 0\ndebut{index}:\nmov rdx, [rax+rcx]\ncmp [rbx+rcx], rdx\njne fin{index-1}\ncmp byte [rbx+rcx],0\nje fin{index}\ninc rcx\njmp debut{index}\nfin{index}:\nmov rax, 1\njmp fin{index-2}\nfin{index-1}:\nmov rax, 0\nfin{index-2}:\n"]
+            else:
+                raise Exception("Invalid operator (only + and == for type str)")
     elif expr.data == "cat":
         [type_e2,e2] = compile_expr(expr.children[1])
         if type_e2 != "int":
@@ -253,14 +260,11 @@ prg = grammaire.parse("""int main(int X) {
     B = 'ab';
     str C;
     C = 'cde';
-    B = B+C;
-    X = B.cAt(X);
-    printf(1==1);
-    printf(0==1);
-    printf(2>=1);
-    printf(0>=1);
-    printf(3<4);
-    printf(0>1);
+    str D;
+    D = 'cde';
+
+    printf( B==C );
+    printf( C == D );
 return(X); }""")
 
 #print(prg)
