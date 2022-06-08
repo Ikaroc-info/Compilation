@@ -246,10 +246,10 @@ def compile_cmd(cmd):
         return f"{compile_expr(cmd.children[0])[1]}\nmov rdi, fmt\nmov rsi,rax\nxor rax,rax\ncall printf"
 
     elif cmd.data == "while":
-        e = compile_expr(cmd.children[0])
-        b = compile_bloc(cmd.children[1])
+        [type_e1,e1] = compile_expr(cmd.children[0])
+        e2 = compile_bloc(cmd.children[1])
         index=next(cpt)
-        return f"debut{index}:{e}\ncmp rax,0\njz fin{index}\n{b}\njmp debut{index}\nfin{index}:\n"
+        return f"debut{index}:{e1}\ncmp rax,0\njz fin{index}\n{e2}\njmp debut{index}\nfin{index}:\n"
     elif cmd.data == "variable":
         if cmd.children[0].children[1].value in Dict.keys():
             raise Exception(f"Variable {cmd.children[0].children[1].value} already declared")
