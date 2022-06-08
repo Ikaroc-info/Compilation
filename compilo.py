@@ -279,8 +279,8 @@ def symb_type(type_):
         raise Exception(f"Type {type_} not implemented")
 
 
-fichier_source=sys.argv[1]
-mod=sys.argv[2]
+fichier_source=sys.argv[2]
+mod=sys.argv[1]
 filin = open(fichier_source, "r")
 lignes = filin.readlines()
 filin.close()
