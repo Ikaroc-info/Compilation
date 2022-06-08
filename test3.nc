@@ -1,4 +1,4 @@
-int main(int x,int y){
+str main(int x,int y){
     int** p;
     p = malloc(4);
     *p = malloc(4);
@@ -12,5 +12,5 @@ int main(int x,int y){
         x = x-1;
     }
     printf(x);
-    return(len(B));
+    return(B);
 }
