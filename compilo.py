@@ -7,7 +7,7 @@ strCpt = -16
 Dict = {}
 grammaire = lark.Lark("""
 variables : typed_variable (","  typed_variable)*
-expr :  IDENTIFIANT -> variable | NUMBER -> nombre | "'" STR "'"-> str | "malloc" "(" expr ")" -> malloc | IDENTIFIANT ".cAt" "(" expr ")" -> cat 
+expr :  IDENTIFIANT -> variable | NUMBER -> nombre | "'" STR "'"-> str | "malloc" "(" expr ")" -> malloc | expr ".cAt" "(" expr ")" -> cat 
 | expr OP expr -> binexpr | "(" expr ")" -> parenexpr | POINTER expr -> valeur | "&" IDENTIFIANT -> adresse | "len(" expr ")" -> len 
 
 cmd : IDENTIFIANT "=" expr ";"-> assignment | POINTER IDENTIFIANT "=" expr ";"-> assignment1 |"while" "(" expr ")" "{" bloc "}" -> while
@@ -175,10 +175,13 @@ def compile_expr(expr):
                 raise Exception("Invalid operator (only + and == for type str)")
 
     elif expr.data == "cat":
+        [type_e1,e1] = compile_expr(expr.children[0])
         [type_e2,e2] = compile_expr(expr.children[1])
+        if symb_type(type_e1) != "str":
+            raise Exception(f".cAt() take only str as argument, not {type_e1}")
         if symb_type(type_e2) != "int":
             raise Exception(f".cAt() take only int as argument, not {type_e2}")
-        return ["int",f"{e2}\nmov rbx,rax\nmov rax, [{expr.children[0]}]\nadd rbx,rax\n movzx eax, BYTE [rbx]\n movsx eax, al\nmov DWORD [_A], eax\nmov rax, [_A]"]
+        return ["int",f"{e2}\nmov rbx,rax\n{e1}\nadd rbx,rax\n movzx eax, BYTE [rbx]\n movsx eax, al\nmov DWORD [_A], eax\nmov rax, [_A]"]
 
 
     elif expr.data == "parenexpr":
