@@ -1,4 +1,6 @@
-int main(int A) {
+int main() {
+    int A;
+    A=2;
     int B;
     B=1;
     B=B+A;
