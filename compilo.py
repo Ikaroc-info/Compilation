@@ -139,7 +139,14 @@ def compile_expr(expr):
         for i in range(nb-1):
             rtn += f"mov rbx, [rbx]\n"
         rtn += "mov rax, [rbx]"
-        return [Dict[expr.children[1].children[0].value]["type"],rtn]
+        j=0
+        type_calcul=Dict[expr.children[1].children[0].value]["type"]
+        while "*" in type_calcul and j<nb:
+            type_calcul=type_calcul[:-1]
+            j+=1
+        if type_calcul=="str" and j<nb:
+            raise Exception(f"str type not supported as a pointer")
+        return [type_calcul,rtn]
 
     elif expr.data == "adresse":
         return ["int", f"lea rax, [{expr.children[0].value}]"]
@@ -276,8 +283,8 @@ def symb_type(type_):
         raise Exception(f"Type {type_} not implemented")
 
 
-fichier_source=sys.argv[1]
-mod=sys.argv[2]
+fichier_source=sys.argv[2]
+mod=sys.argv[1]
 filin = open(fichier_source, "r")
 lignes = filin.readlines()
 filin.close()
