@@ -45,7 +45,9 @@ printf(A.cAt(2));
 printf(len(A));
 printf(A.setcAt(2,'d'));
 ```
+<u>Pour les variables</u>
 
+Possibilité de récupérer l'adresse d'une variable grâce à `&<Variable>` et l'endroit que le contenu de la case mémoire défini par un pointeur avec `*<Pointeur>` 
 
 # Compilation
 
