@@ -117,6 +117,10 @@ def compile(prg):
         code=code.replace("BODY",compile_bloc(prg.children[2]))
         code = code.replace("VAR_INIT",compile_vars(prg.children[1]))
         code=code.replace("RETURN",compile_expr(prg.children[3])[1])
+        type_ret = "fmt"
+        if(compile_expr(prg.children[3])[0] =="str"):
+            type_ret += "1"
+        code = code.replace("TYPE_RET",type_ret)
         if symb_type(compile_expr(prg.children[3])[0])!=symb_type(prg.children[0]):
             raise Exception("Return type main mismatch")     
         return code
@@ -243,7 +247,10 @@ def compile_cmd(cmd):
         return rtn
 
     elif cmd.data == "printf":
-        return f"{compile_expr(cmd.children[0])[1]}\nmov rdi, fmt\nmov rsi,rax\nxor rax,rax\ncall printf"
+        if compile_expr(cmd.children[0])[0] == "int":
+            return f"{compile_expr(cmd.children[0])[1]}\nmov rdi, fmt\nmov rsi,rax\nxor rax,rax\ncall printf"
+        elif compile_expr(cmd.children[0])[0] == "str":
+            return f"{compile_expr(cmd.children[0])[1]}\nmov rdi, fmt1\nmov rsi,rax\nxor rax,rax\ncall printf"
 
     elif cmd.data == "while":
         [type_e1,e1] = compile_expr(cmd.children[0])

@@ -2,6 +2,7 @@ extern printf, atoi, malloc
 global main
 section .data
 fmt: db "%d", 10, 0
+fmt1: db "%s", 10, 0
 _A : dq 0
 VAR_DECL
 
@@ -16,7 +17,7 @@ VAR_INIT
 BODY
 RETURN
 
-  mov rdi, fmt
+  mov rdi, TYPE_RET
   mov rsi, rax
   xor rax, rax
   call printf
