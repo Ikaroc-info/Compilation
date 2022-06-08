@@ -2,11 +2,9 @@ import sys
 from glob import glob
 import lark
 global Dict
-global strCpt 
-strCpt = -16
 Dict = {}
 grammaire = lark.Lark("""
-variables : typed_variable (","  typed_variable)*
+variables : (","*  typed_variable)*
 expr :  IDENTIFIANT -> variable | NUMBER -> nombre | "'" STR "'"-> str | "malloc" "(" expr ")" -> malloc | expr ".cAt" "(" expr ")" -> cat 
 | expr OP expr -> binexpr | "(" expr ")" -> parenexpr | POINTER expr -> valeur | "&" IDENTIFIANT -> adresse | "len(" expr ")" -> len 
 
@@ -127,7 +125,6 @@ def compile(prg):
 
 def compile_expr(expr):
     global Dict
-    global strCpt
     if expr.data == "variable":
         if expr.children[0].value not in Dict.keys():
             raise Exception(f"Variable {expr.children[0].value} not declared")
@@ -270,6 +267,12 @@ def compile_cmd(cmd):
             raise Exception(f"Variable {cmd.children[0].children[1].value} already declared")
         Dict[cmd.children[0].children[1].value]={"type":cmd.children[0].children[0].value}
         return ""
+    
+    elif cmd.data == "if":
+        [type_e1,e1] = compile_expr(cmd.children[0])
+        e2 = compile_bloc(cmd.children[1])
+        index=next(cpt)
+        return f"debut{index}:{e1}\ncmp rax,0\njz fin{index}\n{e2}\nfin{index}:\n"
 
     elif cmd.data == "setcat":
         [type_e1,e1] = compile_expr(cmd.children[1])

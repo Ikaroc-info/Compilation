@@ -1,4 +1,5 @@
-int main(int A){
+int main(){
+    int A;
     str B;
     A=2;
     B='abc';
