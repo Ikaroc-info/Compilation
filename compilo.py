@@ -7,7 +7,7 @@ strCpt = -16
 Dict = {}
 grammaire = lark.Lark("""
 variables : typed_variable (","  typed_variable)*
-expr :  IDENTIFIANT -> variable | NUMBER -> nombre | "'" STR "'"-> str | "malloc" "(" expr ")" -> malloc | IDENTIFIANT ".cAt" "(" expr ")" -> cat 
+expr :  IDENTIFIANT -> variable | NUMBER -> nombre | "'" STR "'"-> str | "malloc" "(" expr ")" -> malloc | expr ".cAt" "(" expr ")" -> cat 
 | expr OP expr -> binexpr | "(" expr ")" -> parenexpr | POINTER expr -> valeur | "&" IDENTIFIANT -> adresse | "len(" expr ")" -> len 
 
 cmd : IDENTIFIANT "=" expr ";"-> assignment | POINTER IDENTIFIANT "=" expr ";"-> assignment1 |"while" "(" expr ")" "{" bloc "}" -> while
@@ -117,6 +117,10 @@ def compile(prg):
         code=code.replace("BODY",compile_bloc(prg.children[2]))
         code = code.replace("VAR_INIT",compile_vars(prg.children[1]))
         code=code.replace("RETURN",compile_expr(prg.children[3])[1])
+        type_ret = "fmt"
+        if(compile_expr(prg.children[3])[0] =="str"):
+            type_ret += "1"
+        code = code.replace("TYPE_RET",type_ret)
         if symb_type(compile_expr(prg.children[3])[0])!=symb_type(prg.children[0]):
             raise Exception("Return type main mismatch")     
         return code
@@ -134,7 +138,7 @@ def compile_expr(expr):
     elif expr.data == "valeur":
         if expr.children[1].children[0].value not in Dict.keys():
             raise Exception(f"Variable {expr.children[1].children[0].value} not declared")
-        rtn = f"mov rbx, [{expr.children[1].children[0].value}]\n"
+        rtn = f"mov rdx, [{expr.children[1].children[0].value}]\n"
         nb = str(expr.children[0].value).count("*")
         for i in range(nb-1):
             rtn += f"mov rbx, [rbx]\n"
@@ -147,6 +151,7 @@ def compile_expr(expr):
         if type_calcul=="str" and j<nb:
             raise Exception(f"str type not supported as a pointer")
         return [type_calcul,rtn]
+
 
     elif expr.data == "adresse":
         return ["int", f"lea rax, [{expr.children[0].value}]"]
@@ -182,10 +187,13 @@ def compile_expr(expr):
                 raise Exception("Invalid operator (only + and == for type str)")
 
     elif expr.data == "cat":
+        [type_e1,e1] = compile_expr(expr.children[0])
         [type_e2,e2] = compile_expr(expr.children[1])
+        if symb_type(type_e1) != "str":
+            raise Exception(f".cAt() take only str as argument, not {type_e1}")
         if symb_type(type_e2) != "int":
             raise Exception(f".cAt() take only int as argument, not {type_e2}")
-        return ["int",f"{e2}\nmov rbx,rax\nmov rax, [{expr.children[0]}]\nadd rbx,rax\n movzx eax, BYTE [rbx]\n movsx eax, al\nmov DWORD [_A], eax\nmov rax, [_A]"]
+        return ["int",f"{e2}\nmov rbx,rax\n{e1}\nadd rbx,rax\n movzx eax, BYTE [rbx]\n movsx eax, al\nmov DWORD [_A], eax\nmov rax, [_A]"]
 
 
     elif expr.data == "parenexpr":
@@ -247,13 +255,16 @@ def compile_cmd(cmd):
         return rtn
 
     elif cmd.data == "printf":
-        return f"{compile_expr(cmd.children[0])[1]}\nmov rdi, fmt\nmov rsi,rax\nxor rax,rax\ncall printf"
+        if compile_expr(cmd.children[0])[0] == "int":
+            return f"{compile_expr(cmd.children[0])[1]}\nmov rdi, fmt\nmov rsi,rax\nxor rax,rax\ncall printf"
+        elif compile_expr(cmd.children[0])[0] == "str":
+            return f"{compile_expr(cmd.children[0])[1]}\nmov rdi, fmt1\nmov rsi,rax\nxor rax,rax\ncall printf"
 
     elif cmd.data == "while":
-        e = compile_expr(cmd.children[0])
-        b = compile_bloc(cmd.children[1])
+        [type_e1,e1] = compile_expr(cmd.children[0])
+        e2 = compile_bloc(cmd.children[1])
         index=next(cpt)
-        return f"debut{index}:{e}\ncmp rax,0\njz fin{index}\n{b}\njmp debut{index}\nfin{index}:\n"
+        return f"debut{index}:{e1}\ncmp rax,0\njz fin{index}\n{e2}\njmp debut{index}\nfin{index}:\n"
     elif cmd.data == "variable":
         if cmd.children[0].children[1].value in Dict.keys():
             raise Exception(f"Variable {cmd.children[0].children[1].value} already declared")
@@ -263,7 +274,7 @@ def compile_cmd(cmd):
     elif cmd.data == "setcat":
         [type_e1,e1] = compile_expr(cmd.children[1])
         [type_e2,e2] = compile_expr(cmd.children[2])
-        if type_e2 != "int" or type_e1 != "int":
+        if symb_type(type_e2) != "int" or symb_type(type_e1) != "int":
             raise Exception("Incompatible types, needs int")
         return f"{e1}\nmov rbx,rax\nmov rax, [{cmd.children[0]}]\n add rbx,rax\n {e2}\n mov [rbx], al\n"
         

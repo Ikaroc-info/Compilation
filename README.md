@@ -30,6 +30,8 @@ Fonction supportées : printf ;
 str var;
 var = 'string';
 ```
+`On ne pourra attribuer uniquement des chaînes de caractères commençant par une lettre et contenant des lettres et des chiffres`
+
 Opérateur supportés : + ; == ;
 
 Fonction supportées :  cAt ; len ; setcAt ;
@@ -46,6 +48,20 @@ printf(A.setcAt(2,'d'));
 
 
 # Compilation
+
+## Manuelle
+
+Afin de compiler les programmes désirés, vous pourrez exécuter les commandes suivantes (les modes disponibles sont `cp` pour compiler et `pp` pour le pretty printer :
+
+``` 
+python3 compilo.py <mode> <fichier_a_compiler> > hum.asm
+nasm -felf64 hum.asm
+gcc -o sortie -no-pie -fno-pie hum.o 
+./sortie <arguments>
+```
+
+## Automatique
+
 Il est possible de compiler votre programme en utilisant un fichier bash fournit compil.sh, son premier argument correspond au nom du fichier à compiler, et son second argument correspond au nom du fichier exécutable en sortie.
 
 `./compil.sh <nom_fichier_a_compiler> <nom_executable_en_sortie>`

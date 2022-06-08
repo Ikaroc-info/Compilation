@@ -1,2 +1,2 @@
 #!/bin/bash
-python3 compilo.py $1 pp > $2
+python3 compilo.py pp $1 > $2
