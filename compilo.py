@@ -255,9 +255,9 @@ def compile_cmd(cmd):
         return rtn
 
     elif cmd.data == "printf":
-        if compile_expr(cmd.children[0])[0] == "int":
+        if symb_type(compile_expr(cmd.children[0])[0]) == "int":
             return f"{compile_expr(cmd.children[0])[1]}\nmov rdi, fmt\nmov rsi,rax\nxor rax,rax\ncall printf"
-        elif compile_expr(cmd.children[0])[0] == "str":
+        elif symb_type(compile_expr(cmd.children[0])[0]) == "str":
             return f"{compile_expr(cmd.children[0])[1]}\nmov rdi, fmt1\nmov rsi,rax\nxor rax,rax\ncall printf"
 
     elif cmd.data == "while":
