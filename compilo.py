@@ -134,11 +134,11 @@ def compile_expr(expr):
     elif expr.data == "valeur":
         if expr.children[1].children[0].value not in Dict.keys():
             raise Exception(f"Variable {expr.children[1].children[0].value} not declared")
-        rtn = f"mov rbx, [{expr.children[1].children[0].value}]\n"
+        rtn = f"mov rdx, [{expr.children[1].children[0].value}]\n"
         nb = str(expr.children[0].value).count("*")
         for i in range(nb-1):
-            rtn += f"mov rbx, [rbx]\n"
-        rtn += "mov rax, [rbx]"
+            rtn += f"mov rdx, [rdx]\n"
+        rtn += "mov rax, [rdx]"
         return [Dict[expr.children[1].children[0].value]["type"],rtn]
 
     elif expr.data == "adresse":
