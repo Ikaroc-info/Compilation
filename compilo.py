@@ -138,8 +138,8 @@ def compile_expr(expr):
         rtn = f"mov rdx, [{expr.children[1].children[0].value}]\n"
         nb = str(expr.children[0].value).count("*")
         for i in range(nb-1):
-            rtn += f"mov rbx, [rbx]\n"
-        rtn += "mov rax, [rbx]"
+            rtn += f"mov rdx, [rdx]\n"
+        rtn += "mov rax, [rdx]"
         j=0
         type_calcul=Dict[expr.children[1].children[0].value]["type"]
         while "*" in type_calcul and j<nb:
