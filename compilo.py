@@ -141,9 +141,17 @@ def compile_expr(expr):
         rtn = f"mov rdx, [{expr.children[1].children[0].value}]\n"
         nb = str(expr.children[0].value).count("*")
         for i in range(nb-1):
-            rtn += f"mov rdx, [rdx]\n"
-        rtn += "mov rax, [rdx]"
-        return [Dict[expr.children[1].children[0].value]["type"],rtn]
+            rtn += f"mov rbx, [rbx]\n"
+        rtn += "mov rax, [rbx]"
+        j=0
+        type_calcul=Dict[expr.children[1].children[0].value]["type"]
+        while "*" in type_calcul and j<nb:
+            type_calcul=type_calcul[:-1]
+            j+=1
+        if type_calcul=="str" and j<nb:
+            raise Exception(f"str type not supported as a pointer")
+        return [type_calcul,rtn]
+
 
     elif expr.data == "adresse":
         return ["int", f"lea rax, [{expr.children[0].value}]"]
