@@ -17,7 +17,7 @@ bloc : (cmd)*
 prog : BASIC_TYPE "main" "(" variables ")" "{" bloc "return" "(" expr ")" ";" "}"
 typed_variable : BASIC_TYPE  IDENTIFIANT
 BASIC_TYPE : /(int|str)[*]*/
-STR : /[a-zA-Z0-9]+/
+STR : /[a-zA-Z0-9 :.;!?,"-]+/
 NUMBER : /[0-9]+/
 OP : /([+\*-]|==|!=|>=|<=|>|<)/
 IDENTIFIANT : /[a-zA-Z][a-zA-Z0-9]*/
