@@ -30,6 +30,8 @@ Fonction supportées : printf ;
 str var;
 var = 'string';
 ```
+`On ne pourra attribuer uniquement des chaînes de caractères commençant par une lettre et contenant des lettres et des chiffres`
+
 Opérateur supportés : + ; == ;
 
 Fonction supportées :  cAt ; len ; setcAt ;
